@@ -38,7 +38,7 @@ namespace CmdExtension
             tbCommands.SelectionStart = tbCommands.Text.Length;
         }
 
-        private void tbCommands_KeyDown(object sender, KeyEventArgs e)
+        private async void tbCommands_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Control)
             {
@@ -74,10 +74,17 @@ namespace CmdExtension
                     e.SuppressKeyPress = tbCommands.SelectionStart < immutableString.Length ? true : false;
                     break;
                 case Keys.Enter:
+                    e.SuppressKeyPress = true;
                     string command = tbCommands.Text;
-                    StartProcess(command);
-                    //tbCommands.Text += Environment.NewLine;
-                    tbCommands.Text += "> ";
+                    tbCommands.Text += Environment.NewLine + "> ";
+                    tbCommands.SelectionStart = tbCommands.Text.Length;
+                    tbCommands.ScrollToCaret();
+                    immutableString = tbCommands.Text;
+                    int index = command.IndexOf(immutableString);
+                    if (index != -1)
+                        command = command.Remove(index, immutableString.Length).Replace("\r\n",string.Empty).TrimStart();
+        
+                    await StartProcessAsync(command);
                     break;
                 default:
                     break;
@@ -85,30 +92,39 @@ namespace CmdExtension
 
         }
 
-        private void StartProcess(string command)
+        private async Task StartProcessAsync(string command)
         {
-            var proc = new Process
+            await Task.Run(() =>
             {
-                StartInfo = new ProcessStartInfo
+                var proc = new Process
                 {
-                    FileName = @"cmd.exe",
-                    Arguments = $"/c {command}",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true,
-                    WorkingDirectory = tbWorkingDirectory.Text
-                }
-            };
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = @"cmd.exe",
+                        Arguments = $"/c {command}",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true,
+                        WorkingDirectory = tbWorkingDirectory.Text
+                    }
+                };
 
-            proc.Start();
+                proc.Start();
 
-            proc.WaitForExit();
-            tbOutput.Text = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit();
+                string output = proc.StandardOutput.ReadToEnd();
+                tbOutput.Invoke(new Action(() =>
+                {
+                    tbOutput.Text = output;
+                }));
+            });
         }
+
 
 
         private void tbCommands_TextChanged(object sender, EventArgs e)
         {
+    
             if (tbCommands.Text == "")
                 tbCommands.Text = immutableString;
         }
